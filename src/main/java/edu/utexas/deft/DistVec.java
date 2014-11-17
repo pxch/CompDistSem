@@ -12,6 +12,8 @@ import org.apache.spark.api.java.function.PairFlatMapFunction;
 import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.storage.StorageLevel;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -42,7 +44,7 @@ public class DistVec {
             }
 */
             List<String> words = Arrays.asList(SPACE.split(s.toLowerCase()));
-
+/*
             List<String> pairs = new ArrayList<String>();
             for (int w = 1; w <= windowSize; ++w) {
                 for (int i = 0; i < words.size() - w; ++i) {
@@ -52,16 +54,27 @@ public class DistVec {
                     pairs.add(pair);
                 }
             }
-
+*/
             List<Tuple2<String, Integer>> terms = new ArrayList<Tuple2<String, Integer>>();
             for (int i = 0; i < words.size(); ++i) {
                 terms.add(new Tuple2<String, Integer>(words.get(i), 1));
             }
-            for (int i = 0; i < pairs.size(); ++i) {
+/*            for (int i = 0; i < pairs.size(); ++i) {
                 terms.add(new Tuple2<String, Integer>(pairs.get(i), 1));
             }
-
+*/
             return terms;
+        }
+    }
+
+    public static class CountFilter implements Function<Tuple2<String, Integer>, Boolean> {
+        int thres;
+        public CountFilter(int t) {
+            thres = t;
+        }
+        @Override
+        public Boolean call(Tuple2<String, Integer> t) {
+            return (t._2 >= thres);
         }
     }
 
@@ -89,14 +102,12 @@ public class DistVec {
     public static class ComputePMI implements
         Function<Tuple2<String, Integer>, Tuple2<String, Double>>, Serializable {
 
-        Map<String, Integer> wordCountMap;
-        List<String> wordList;
+        Map<String, Tuple2<Integer, Integer>> wordCountIdxMap;
         long wordTotalCount;
         long pairTotalCount;
 
-        public ComputePMI(long wc, long pc, Map<String, Integer> wm, List<String> wl) {
-            wordCountMap = wm;
-            wordList = wl;
+        public ComputePMI(long wc, long pc, Map<String, Tuple2<Integer, Integer>> map) {
+            wordCountIdxMap = map;
             wordTotalCount = wc;
             pairTotalCount = pc;
         }
@@ -107,8 +118,25 @@ public class DistVec {
             int pairCount = t._2;
             String word1 = pair.split("\t")[0];
             String word2 = pair.split("\t")[1];
-            int word1Count = wordCountMap.containsKey(word1) ? wordCountMap.get(word1) : 0;
-            int word2Count = wordCountMap.containsKey(word2) ? wordCountMap.get(word2) : 0;
+            int word1Count, word2Count, word1Idx, word2Idx;
+            Tuple2<Integer, Integer> countIdxPair;
+            if (wordCountIdxMap.containsKey(word1)) {
+                countIdxPair = wordCountIdxMap.get(word1);
+                word1Count = countIdxPair._1;
+                word1Idx = countIdxPair._2;
+            } else {
+                word1Count = 0;
+                word1Idx = -1;
+            }
+            if (wordCountIdxMap.containsKey(word2)) {
+                countIdxPair = wordCountIdxMap.get(word2);
+                word2Count = countIdxPair._1;
+                word2Idx = countIdxPair._2;
+            } else {
+                word2Count = 0;
+                word2Idx = -1;
+            }
+            
             double pmi;
             if (word1Count == 0 || word2Count == 0) {
                 pmi = 0.0;
@@ -118,8 +146,6 @@ public class DistVec {
                 double word2Prob = (double) word2Count / wordTotalCount;
                 pmi = Math.log(pairProb / (word1Prob * word2Prob));
             }
-            int word1Idx = wordList.indexOf(word1);
-            int word2Idx = wordList.indexOf(word2);
             String pairIdx = word1Idx < word2Idx ?
                 Integer.toString(word1Idx) + "\t" + Integer.toString(word2Idx) :
                 Integer.toString(word2Idx) + "\t" + Integer.toString(word1Idx);
@@ -146,39 +172,49 @@ public class DistVec {
         JavaPairRDD<String, Integer> ones = lines.flatMapToPair(new ParseLine(ws));
         JavaPairRDD<String, Integer> counts = ones.reduceByKey(new Sum());
 
+        JavaPairRDD<String, Integer> filterCounts = counts.filter(new CountFilter(10));
+        filterCounts.saveAsTextFile(path + "/wordCounts");
+/*
         long wordTotalCount = ones.filter(new WordFilter()).count();
         long pairTotalCount = ones.filter(new PairFilter()).count();
 
         JavaPairRDD<String, Integer> wordCounts = counts.filter(new WordFilter());
-//        wordCounts.persist(StorageLevel.MEMORY_ONLY_SER());
 
-//        Map<String, Integer> wordCountsMap = wordCounts.collectAsMap();
-
-//        Map<String, Integer> tmpMap = wordCounts.collectAsMap();
-//        Map<String, Integer> wordCountsMap = new HashMap<String, Integer>(tmpMap);
         Map<String, Integer> wordCountMap = new HashMap<String, Integer>(
             wordCounts.collectAsMap());
 
-        ArrayList<String> wordList = new ArrayList<String>(
+        JavaRDD<String> wordList = wordCounts.sortByKey().keys();
+
+        ArrayList<String> wordArrayList = new ArrayList<String>(
             wordCounts.sortByKey().keys().collect());
+
+        Map<String, Tuple2<Integer, Integer>> wordCountIdxMap =
+            new HashMap<String, Tuple2<Integer, Integer>>();
+
+        for (int idx = 0; idx < wordArrayList.size(); ++idx) {
+            String word = wordArrayList.get(idx);
+            int count = wordCountMap.get(word);
+            wordCountIdxMap.put(word, new Tuple2<Integer, Integer>(count, idx));
+        }
 
         JavaPairRDD<String, Integer> pairCounts = counts.filter(new PairFilter());
 
 //        wordCounts.saveAsTextFile(path + "/wordCounts");
 //        pairCounts.saveAsTextFile(path + "/pairCounts");
 
-//        pairCounts.persist(StorageLevel.MEMORY_ONLY_SER());
-/*
-        ComputePMI computePMI = new ComputePMI(wordTotalCount, pairTotalCount, wordCountsMap);
-
-        JavaPairRDD<String, Double> pairPMI = JavaPairRDD.fromJavaRDD(
-            pairCounts.map(computePMI));
-*/
         JavaPairRDD<String, Double> pairPMI = JavaPairRDD.fromJavaRDD(
             pairCounts.map(
-                new ComputePMI(wordTotalCount, pairTotalCount, wordCountMap, wordList)));
+                new ComputePMI(wordTotalCount, pairTotalCount, wordCountIdxMap)));
 
         pairPMI.saveAsTextFile(path + "/pmi");
+
+        wordList.saveAsTextFile(path + "/vocabulary");
+
+        BufferedWriter output = new BufferedWriter(new FileWriter("vocabulary.txt"));
+        for (int i = 0; i < wordArrayList.size(); ++i) {
+            output.write(wordArrayList.get(i) + "\n");
+        }
+        output.close();
 
 /*
         System.out.println("word vocabulary size: " + wordCounts.count());
