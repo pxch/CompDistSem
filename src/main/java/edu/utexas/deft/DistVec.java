@@ -15,6 +15,7 @@ import org.apache.spark.storage.StorageLevel;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.Serializable;
+import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,42 +28,60 @@ public class DistVec {
     private static final Pattern SPACE = Pattern.compile(" ");
     private static final Pattern WORD = Pattern.compile("\\w+");
 
-    public static class ParseLine implements PairFlatMapFunction<String, String, Integer> {
-        int windowSize;
+    public static class ParseWord implements PairFlatMapFunction<String, String, Integer> {
+        @Override
+        public Iterable<Tuple2<String, Integer>> call(String s) {
+            Matcher m = WORD.matcher(s.toLowerCase());
+            List<String> words = Arrays.asList(SPACE.split(s.toLowerCase()));
+            List<Tuple2<String, Integer>> terms = new ArrayList<Tuple2<String, Integer>>();
+            for (int i = 0; i < words.size(); ++i) {
+                terms.add(new Tuple2<String, Integer>(words.get(i), 1));
+            }
+            return terms;
+        }
+    }
 
-        public ParseLine(int ws) {
+    public static class ParsePair implements PairFlatMapFunction<String, String, Integer> {
+        int windowSize;
+        Map<String, Integer> wordCountsMap;
+
+        public ParsePair(int ws, Map<String, Integer> map) {
             windowSize = ws;
+            wordCountsMap = map;
         }
 
         @Override
         public Iterable<Tuple2<String, Integer>> call(String s) {
             Matcher m = WORD.matcher(s.toLowerCase());
-/*
+
+            List<String> rawWords = Arrays.asList(SPACE.split(s.toLowerCase()));
+
             List<String> words = new ArrayList<String>();
-            while (m.find()) {
-                words.add(m.group());
-            }
-*/
-            List<String> words = Arrays.asList(SPACE.split(s.toLowerCase()));
-/*
-            List<String> pairs = new ArrayList<String>();
-            for (int w = 1; w <= windowSize; ++w) {
-                for (int i = 0; i < words.size() - w; ++i) {
-                    String pair = words.get(i).compareTo(words.get(i+w)) < 0 ?
-                        words.get(i) + "\t" + words.get(i+w) :
-                        words.get(i+w) + "\t" + words.get(i);
-                    pairs.add(pair);
+            for (int i = 0; i < rawWords.size(); ++i) {
+                if (wordCountsMap.containsKey(rawWords.get(i))) {
+                    words.add(rawWords.get(i));
                 }
             }
-*/
-            List<Tuple2<String, Integer>> terms = new ArrayList<Tuple2<String, Integer>>();
-            for (int i = 0; i < words.size(); ++i) {
-                terms.add(new Tuple2<String, Integer>(words.get(i), 1));
+
+            List<String> pairs = new ArrayList<String>();
+            String word1, word2;
+            for (int w = 1; w <= windowSize; ++w) {
+                for (int i = 0; i < words.size() - w; ++i) {
+                    word1 = words.get(i);
+                    word2 = words.get(i+w);
+//                    if (wordCountsMap.containsKey(word1) && wordCountsMap.containsKey(word2)) {
+                        String pair = word1.compareTo(word2) < 0 ?
+                            word1 + "\t" + word2 : word2 + "\t" + word1;
+                        pairs.add(pair);
+//                    }
+                }
             }
-/*            for (int i = 0; i < pairs.size(); ++i) {
+
+            List<Tuple2<String, Integer>> terms = new ArrayList<Tuple2<String, Integer>>();
+            for (int i = 0; i < pairs.size(); ++i) {
                 terms.add(new Tuple2<String, Integer>(pairs.get(i), 1));
             }
-*/
+
             return terms;
         }
     }
@@ -84,7 +103,7 @@ public class DistVec {
             return i1 + i2;
         }
     }
-
+/*
     public static class WordFilter implements Function<Tuple2<String, Integer>, Boolean> {
         @Override
         public Boolean call(Tuple2<String, Integer> t) {
@@ -98,9 +117,9 @@ public class DistVec {
             return t._1.contains("\t");
         }
     }
-
+*/
     public static class ComputePMI implements
-        Function<Tuple2<String, Integer>, Tuple2<String, Double>>, Serializable {
+        Function<Tuple2<String, Integer>, Tuple2<String, Double>> {
 
         Map<String, Tuple2<Integer, Integer>> wordCountIdxMap;
         long wordTotalCount;
@@ -153,6 +172,31 @@ public class DistVec {
         }
     }
 
+    public static class SparseVecMapper implements
+        PairFlatMapFunction<Tuple2<String, Double>, String, String> {
+        
+        static DecimalFormat formatter = new DecimalFormat("#.######");
+
+        @Override
+        public Iterable<Tuple2<String, String>> call(Tuple2<String, Double> pmi) {
+            List<Tuple2<String, String>> results = new ArrayList<Tuple2<String, String>>();
+            String pair = pmi._1;
+            String value = formatter.format(pmi._2);
+            String[] words = pair.split("\t");
+            results.add(new Tuple2<String, String>(words[0], words[1] + ":" + value));
+            results.add(new Tuple2<String, String>(words[1], words[0] + ":" + value));
+            return results;
+        }
+    }
+
+    public static class SparseVecReducer implements
+        Function2<String, String, String> {
+        @Override
+        public String call(String left, String right) {
+            return left + "\t" + right;
+        }
+    }
+
     public static void main(String[] args) throws Exception {
 
         if (args.length < 3) {
@@ -162,31 +206,34 @@ public class DistVec {
 
         String file = args[0];
         String path = args[1];
-        int ws = Integer.valueOf(args[2]);
+        int windowSize = Integer.valueOf(args[2]);
 
         SparkConf sparkConf = new SparkConf().setAppName("Distributional Vector");
         JavaSparkContext ctx = new JavaSparkContext(sparkConf);
 
         JavaRDD<String> lines = ctx.textFile(file, 1);
 
-        JavaPairRDD<String, Integer> ones = lines.flatMapToPair(new ParseLine(ws));
-        JavaPairRDD<String, Integer> counts = ones.reduceByKey(new Sum());
+        JavaPairRDD<String, Integer> wordOnes = lines.flatMapToPair(new ParseWord());
+        long wordTotalCount = wordOnes.count();
 
-        JavaPairRDD<String, Integer> filterCounts = counts.filter(new CountFilter(10));
-        filterCounts.saveAsTextFile(path + "/wordCounts");
-/*
-        long wordTotalCount = ones.filter(new WordFilter()).count();
-        long pairTotalCount = ones.filter(new PairFilter()).count();
+        JavaPairRDD<String, Integer> wordCounts = wordOnes.reduceByKey(new Sum())
+            .filter(new CountFilter(10));
 
-        JavaPairRDD<String, Integer> wordCounts = counts.filter(new WordFilter());
+        wordCounts.saveAsTextFile(path + "/wordcounts");
 
         Map<String, Integer> wordCountMap = new HashMap<String, Integer>(
             wordCounts.collectAsMap());
 
-        JavaRDD<String> wordList = wordCounts.sortByKey().keys();
+        JavaPairRDD<String, Integer> pairOnes = lines.flatMapToPair(
+            new ParsePair(windowSize, wordCountMap));
+        long pairTotalCount = pairOnes.count();
 
-        ArrayList<String> wordArrayList = new ArrayList<String>(
-            wordCounts.sortByKey().keys().collect());
+        JavaPairRDD<String, Integer> pairCounts = pairOnes.reduceByKey(new Sum());
+
+        JavaRDD<String> wordList = wordCounts.sortByKey().keys();
+        wordList.saveAsTextFile(path + "/vocabulary");
+
+        ArrayList<String> wordArrayList = new ArrayList<String>(wordList.collect());
 
         Map<String, Tuple2<Integer, Integer>> wordCountIdxMap =
             new HashMap<String, Tuple2<Integer, Integer>>();
@@ -197,40 +244,18 @@ public class DistVec {
             wordCountIdxMap.put(word, new Tuple2<Integer, Integer>(count, idx));
         }
 
-        JavaPairRDD<String, Integer> pairCounts = counts.filter(new PairFilter());
-
-//        wordCounts.saveAsTextFile(path + "/wordCounts");
-//        pairCounts.saveAsTextFile(path + "/pairCounts");
-
         JavaPairRDD<String, Double> pairPMI = JavaPairRDD.fromJavaRDD(
             pairCounts.map(
                 new ComputePMI(wordTotalCount, pairTotalCount, wordCountIdxMap)));
 
         pairPMI.saveAsTextFile(path + "/pmi");
 
-        wordList.saveAsTextFile(path + "/vocabulary");
+        JavaPairRDD<String, String> sparseVec = pairPMI
+            .flatMapToPair(new SparseVecMapper())
+            .reduceByKey(new SparseVecReducer());
 
-        BufferedWriter output = new BufferedWriter(new FileWriter("vocabulary.txt"));
-        for (int i = 0; i < wordArrayList.size(); ++i) {
-            output.write(wordArrayList.get(i) + "\n");
-        }
-        output.close();
+        sparseVec.saveAsTextFile(path + "/sparsevec");
 
-/*
-        System.out.println("word vocabulary size: " + wordCounts.count());
-        System.out.println("pair vocabulary size: " + pairCounts.count());
-        System.out.println("total vocabulary size: " + counts.count());
-
-        counts.saveAsTextFile(path + "/counts");
-/*
-        JavaRDD<String> words = getWords(lines);
-        JavaPairRDD<String, Integer> wordCounts = getCounts(words);
-        wordCounts.saveAsTextFile(path + "/wordCounts");
-
-        JavaRDD<String> pairs = getPairs(lines, ws);
-        JavaPairRDD<String, Integer> pairCounts = getCounts(pairs);
-        pairCounts.saveAsTextFile(path + "/pairCounts");
-*/
     }
 }
 
