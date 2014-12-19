@@ -18,6 +18,8 @@ import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -119,7 +121,7 @@ public class DistVec {
     }
 */
     public static class ComputePMI implements
-        Function<Tuple2<String, Integer>, Tuple2<String, Double>> {
+        FlatMapFunction<Tuple2<String, Integer>, Tuple2<String, Double>> {
 
         Map<String, Tuple2<Integer, Integer>> wordCountIdxMap;
         long wordTotalCount;
@@ -132,7 +134,7 @@ public class DistVec {
         }
 
         @Override
-        public Tuple2<String, Double> call(Tuple2<String, Integer> t) {
+        public Iterable<Tuple2<String, Double>> call(Tuple2<String, Integer> t) {
             String pair = t._1;
             int pairCount = t._2;
             String word1 = pair.split("\t")[0];
@@ -165,35 +167,82 @@ public class DistVec {
                 double word2Prob = (double) word2Count / wordTotalCount;
                 pmi = Math.log(pairProb / (word1Prob * word2Prob));
             }
-            String pairIdx = word1Idx < word2Idx ?
-                Integer.toString(word1Idx) + "\t" + Integer.toString(word2Idx) :
-                Integer.toString(word2Idx) + "\t" + Integer.toString(word1Idx);
-            return new Tuple2<String, Double>(pairIdx, pmi);
-        }
-    }
 
-    public static class SparseVecMapper implements
-        PairFlatMapFunction<Tuple2<String, Double>, String, String> {
-        
-        static DecimalFormat formatter = new DecimalFormat("#.######");
-
-        @Override
-        public Iterable<Tuple2<String, String>> call(Tuple2<String, Double> pmi) {
-            List<Tuple2<String, String>> results = new ArrayList<Tuple2<String, String>>();
-            String pair = pmi._1;
-            String value = formatter.format(pmi._2);
-            String[] words = pair.split("\t");
-            results.add(new Tuple2<String, String>(words[0], words[1] + ":" + value));
-            results.add(new Tuple2<String, String>(words[1], words[0] + ":" + value));
+            List<Tuple2<String, Double>> results = new ArrayList<Tuple2<String, Double>>();
+            if (pmi > 0) {
+                String pairIdx = word1Idx < word2Idx ?
+                    Integer.toString(word1Idx) + "\t" + Integer.toString(word2Idx) :
+                    Integer.toString(word2Idx) + "\t" + Integer.toString(word1Idx);
+                results.add(new Tuple2<String, Double>(pairIdx, pmi));
+            }
             return results;
         }
     }
 
+    public static class SparseVecMapper implements
+        PairFlatMapFunction<Tuple2<String, Double>, String, Tuple2<Integer, Double>> {
+
+        @Override
+        public Iterable<Tuple2<String, Tuple2<Integer, Double>>> call(
+            Tuple2<String, Double> pmi) {
+            List<Tuple2<String, Tuple2<Integer, Double>>> results =
+                new ArrayList<Tuple2<String, Tuple2<Integer, Double>>>();
+            double value = pmi._2;
+            String[] words = pmi._1.split("\t");
+            String word1 = words[0];
+            String word2 = words[1];
+            int word1Idx = Integer.valueOf(words[0]);
+            int word2Idx = Integer.valueOf(words[1]);
+
+            results.add(new Tuple2<String, Tuple2<Integer, Double>>(word1,
+                new Tuple2<Integer, Double>(word2Idx, value)));
+            if (word1Idx != word2Idx) {
+                results.add(new Tuple2<String, Tuple2<Integer, Double>>(word2,
+                    new Tuple2<Integer, Double>(word1Idx, value)));
+            }
+//            results.add(new Tuple2<String, String>(words[0], words[1] + ":" + value));
+//            results.add(new Tuple2<String, String>(words[1], words[0] + ":" + value));
+            return results;
+        }
+    }
+/*
     public static class SparseVecReducer implements
         Function2<String, String, String> {
         @Override
         public String call(String left, String right) {
             return left + "\t" + right;
+        }
+    }
+*/
+    public static class SparseVecReducer implements
+        Function<Iterable<Tuple2<Integer, Double>>, String> {
+
+        static Comparator<Tuple2<Integer, Double>> itemComparator =
+            new Comparator<Tuple2<Integer, Double>>() {
+            @Override
+            public int compare(Tuple2<Integer, Double> left, Tuple2<Integer, Double> right) {
+                return left._1.compareTo(right._1);
+            }
+        };
+
+        static DecimalFormat formatter = new DecimalFormat("#.######");
+
+        @Override
+        public String call(Iterable<Tuple2<Integer, Double>> vec) {
+            List<Tuple2<Integer, Double>> vecItems = new ArrayList<Tuple2<Integer, Double>>();
+            for (Tuple2<Integer, Double> item : vec) {
+                vecItems.add(item);
+            }
+            Collections.sort(vecItems, itemComparator);
+
+//            String key = Integer.toString(vec._1);
+            String val = "";
+            for (Tuple2<Integer, Double> item : vecItems) {
+                val += Integer.toString(item._1) + ":" + formatter.format(item._2) + "\t";
+            }
+            val = val.substring(0, val.length() - 1);
+
+            return val; 
         }
     }
 
@@ -245,17 +294,22 @@ public class DistVec {
         }
 
         JavaPairRDD<String, Double> pairPMI = JavaPairRDD.fromJavaRDD(
-            pairCounts.map(
+            pairCounts.flatMap(
                 new ComputePMI(wordTotalCount, pairTotalCount, wordCountIdxMap)));
 
         pairPMI.saveAsTextFile(path + "/pmi");
-
+/*
         JavaPairRDD<String, String> sparseVec = pairPMI
             .flatMapToPair(new SparseVecMapper())
             .reduceByKey(new SparseVecReducer());
+*/
+/*
+        JavaPairRDD<String, String> sparseVec = pairPMI
+            .flatMapToPair(new SparseVecMapper()).groupByKey()
+            .mapValues(new SparseVecReducer());
 
         sparseVec.saveAsTextFile(path + "/sparsevec");
-
+*/
     }
 }
 
