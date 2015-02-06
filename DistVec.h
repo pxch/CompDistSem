@@ -20,7 +20,6 @@ namespace DistVec {
         str_map vocab;
         smat_t pmi;
 
-//        void ReadDir (std::string path, str_vec& files);
     };
 }
 

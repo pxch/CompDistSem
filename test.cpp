@@ -12,12 +12,8 @@ int main (int argc, char *argv[]) {
     }
 
     string vocab_dir = argv[1];
-//    str_map vocab;
-//    DistVec::ReadVocabularyMap(vocab_dir, vocab);
 
     string pmi_dir = argv[2];
-//    smat_t pmi;
-//    DistVec::ReadPMIMatrix(pmi_dir, pmi);
 
     DistVec::DistVec distVec(vocab_dir, pmi_dir);
 

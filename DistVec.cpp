@@ -159,30 +159,5 @@ namespace DistVec {
             return vec1.dot(vec2) / vec1.norm() / vec2.norm();
         }
     }
-/*
-    void DistVec::ReadDir(string path, str_vec& files) {
-        if (path[path.length()-1] != '/') {
-            path += "/";
-        }
-        cout << "Reading from directory " << path;
-
-        files.clear();
-
-        DIR* dir;
-        struct dirent *ent;
-        if ((dir = opendir(path.c_str())) != NULL) {
-            while ((ent = readdir(dir)) != NULL) {
-//                if (strcmp(ent->d_name, ".") != 0 &&
-//                    strcmp(ent->d_name, "..") != 0 &&
-//                    strcmp(ent->d_name, "_SUCCESS") != 0)
-                if (strncmp(ent->d_name, "part-", 5) == 0)
-                    files.push_back(path + ent->d_name);
-            }
-            closedir(dir);
-        }
-
-        cout << ":\tfind " << files.size() << " files." << endl;
-    }
-*/
 }
 
