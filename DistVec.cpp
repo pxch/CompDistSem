@@ -1,4 +1,4 @@
-#include "DistVec.h"
+#include "distvec.h"
 #include "iofuncs.h"
 
 #include <dirent.h>
