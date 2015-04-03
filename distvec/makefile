@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS=-fopenmp -std=c++0x
-INCLUDES=-I./lib
+INCLUDES=-I../lib
 
 all: trainplf compsim
 
