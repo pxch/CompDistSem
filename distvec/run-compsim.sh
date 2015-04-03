@@ -24,6 +24,8 @@ make compsim
 #./compsim 300 50000 ../corpora/ukwac_1_50k_20k_2/wordvocab/ mod_mat_50k_20k_300_1/word.dm mod_mat_50k_20k_300_1/ ../parseRule/output_new_1-rule ph-sim_50k_20k_300.txt
 #./compsim 300 50000 ../corpora/ukwac_1_50k_20k_2/wordvocab/ mod_mat_50k_20k_300_1/word.dm mod_mat_50k_20k_300_1/ ../parseRule/output_new_3_train-rule ph-sim_50k_20k_300_3_train.txt
 #./compsim 300 50000 ../corpora/ukwac_1_50k_20k_2/wordvocab/ mod_mat_50k_20k_300_1/word.dm mod_mat_50k_20k_300_1/ ../parseRule/output_new_3_test-rule ph-sim_50k_20k_300_3_test.txt
-./compsim 300 50000 ../corpora/ukwac_1_50k_20k_2/wordvocab/ mod_mat_50k_20k_300_1/word.dm mod_mat_50k_20k_300_1/ ../parseRule/output_new_3_train-rule ph-sim_50k_20k_300_3_1_train
-./compsim 300 50000 ../corpora/ukwac_1_50k_20k_2/wordvocab/ mod_mat_50k_20k_300_1/word.dm mod_mat_50k_20k_300_1/ ../parseRule/output_new_3_test-rule ph-sim_50k_20k_300_3_1_test
+#./compsim 300 50000 ../corpora/ukwac_1_50k_20k_2/wordvocab/ mod_mat_50k_20k_300_1/word.dm mod_mat_50k_20k_300_1/ ../parseRule/output_new_3_train-rule ph-sim_50k_20k_300_3_1_train
+#./compsim 300 50000 ../corpora/ukwac_1_50k_20k_2/wordvocab/ mod_mat_50k_20k_300_1/word.dm mod_mat_50k_20k_300_1/ ../parseRule/output_new_3_test-rule ph-sim_50k_20k_300_3_1_test
+./compsim 300 50000 ../../corpora/ukwac_1_50k_20k_2/wordvocab/ ../data/mod_mat_50k_20k_300_1/word.dm ../data/mod_mat_50k_20k_300_1/ ../data/rules/final/sick_1_train-rule ../data/phsim/final/sick_1_train
+./compsim 300 50000 ../../corpora/ukwac_1_50k_20k_2/wordvocab/ ../data/mod_mat_50k_20k_300_1/word.dm ../data/mod_mat_50k_20k_300_1/ ../data/rules/final/sick_1_test-rule ../data/phsim/final/sick_1_test
 
