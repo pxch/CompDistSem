@@ -6,4 +6,5 @@ distvec/*.o
 distvec/trainplf
 distvec/compsim
 parse_rule/parse_phrasal_rules*.o*
+parse_rule/*.class
 lib/stanford-corenlp-3.4-models.jar
