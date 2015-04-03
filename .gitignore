@@ -1,3 +1,7 @@
 ####
 *spark/target/
-
+distvec/mod_mat*/
+distvec/distvec_*.o*
+distvec/*.o
+distvec/trainplf
+distvec/compsim
