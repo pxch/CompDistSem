@@ -18,6 +18,9 @@ public class ParseRule {
         public static List<CoreLabel> tokens;
         public static Set<SemanticGraphEdge> deps;
 
+        public static List<IndexedWord> roots;
+        public static List<Integer> depths;
+
         public static List<Integer> origPhIs, phIs;
 
         public static List<String> results;
@@ -58,10 +61,41 @@ public class ParseRule {
             return result;
         }
 
+        public static void getDepths() {
+            for (int i = 0; i < tokens.size(); ++i) {
+                depths.add(-1);
+            }
+
+            for (IndexedWord r : roots) {
+                depth.set(r.index() - 1, 1);
+            }
+            int level = 1;
+            while (true) {
+                ++level;
+                boolean flag = false;
+                for (int idx = 0; idx < depth.size(); ++idx) {
+                    if (depth.get(idx) == level - 1) {
+                        for (SemanticGraphEdge e : deps) {
+                            if (e.getGovernor().index() == idx + 1) {
+                                depth.set(e.getDependent().index() - 1, level);
+                                flag = true;
+                            }
+                        }
+                    }
+                }
+                if (!flag) {
+                    break;
+                }
+            }
+        }
+
         public static String parsePhrase(String ph, Annotation doc) {
             CoreMap sent = doc.get(SentencesAnnotation.class).get(0);
             tokens = sent.get(TokensAnnotation.class);
             deps = sent.get(BasicDependenciesAnnotation.class).getEdgeSet();
+            roots = sent.get(BasicDependenciesAnnotation.class).getRoots();
+
+            depths = getDepths();
 
             origPhIs = cvtPhStrToIndices(ph);
             phIs = filterIndices(origPhIs);
@@ -336,13 +370,13 @@ public class ParseRule {
                     if (phIs.contains(depIdx)) {
                         String adj = getWordStr(tokens.get(depIdx - 1));
                         //if (adj != null) {
-                        if (adj.endsWith("jj")) {
+                        //if (adj.endsWith("jj")) {
                             String compLabel = cntLabel(compCnt);
                             compCnt ++;
                             result += adj + " amod-" + compLabel + " ";
                             result_tail = " " + compLabel + result_tail;
                             phIs.remove(phIs.indexOf(depIdx));
-                        }
+                        //}
                         //}
                     }
                 }
