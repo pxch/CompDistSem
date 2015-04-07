@@ -18,7 +18,7 @@ public class ParseRule {
         public static List<CoreLabel> tokens;
         public static Set<SemanticGraphEdge> deps;
 
-        public static List<IndexedWord> roots;
+        public static Collection<IndexedWord> roots;
         public static List<Integer> depths;
 
         public static List<Integer> origPhIs, phIs;
@@ -54,6 +54,10 @@ public class ParseRule {
         public static List<Integer> filterIndices(List<Integer> phIs) {
             List<Integer> result = new ArrayList<Integer>();
             for (int idx : phIs) {
+                if (idx >= tokens.size()) {
+                    System.out.println("Multiple sentences");
+                    break;
+                }
                 if (getWordStr(tokens.get(idx - 1)) != null) {
                     result.add(idx);
                 }
@@ -61,23 +65,24 @@ public class ParseRule {
             return result;
         }
 
-        public static void getDepths() {
+        public static List<Integer> getDepths() {
+            List<Integer> result = new ArrayList<Integer>();
             for (int i = 0; i < tokens.size(); ++i) {
-                depths.add(-1);
+                result.add(-1);
             }
 
             for (IndexedWord r : roots) {
-                depth.set(r.index() - 1, 1);
+                result.set(r.index() - 1, 1);
             }
             int level = 1;
             while (true) {
                 ++level;
                 boolean flag = false;
-                for (int idx = 0; idx < depth.size(); ++idx) {
-                    if (depth.get(idx) == level - 1) {
+                for (int idx = 0; idx < result.size(); ++idx) {
+                    if (result.get(idx) == level - 1) {
                         for (SemanticGraphEdge e : deps) {
                             if (e.getGovernor().index() == idx + 1) {
-                                depth.set(e.getDependent().index() - 1, level);
+                                result.set(e.getDependent().index() - 1, level);
                                 flag = true;
                             }
                         }
@@ -87,21 +92,47 @@ public class ParseRule {
                     break;
                 }
             }
+            return result;
+        }
+
+        public static int findHighestNode() {
+            int highestDepth = Integer.MAX_VALUE;
+            int highestIdx = -1;
+            for (int idx : phIs) {
+                if (depths.get(idx - 1) < highestDepth && depths.get(idx - 1) != -1) {
+                    highestDepth = depths.get(idx - 1);
+                    highestIdx = idx;
+                }
+            }
+            return highestIdx;
         }
 
         public static String parsePhrase(String ph, Annotation doc) {
-            CoreMap sent = doc.get(SentencesAnnotation.class).get(0);
-            tokens = sent.get(TokensAnnotation.class);
-            deps = sent.get(BasicDependenciesAnnotation.class).getEdgeSet();
-            roots = sent.get(BasicDependenciesAnnotation.class).getRoots();
-
-            depths = getDepths();
-
-            origPhIs = cvtPhStrToIndices(ph);
-            phIs = filterIndices(origPhIs);
-
             results = new ArrayList<String>();
-            parsePhraseCore();
+            origPhIs = cvtPhStrToIndices(ph);
+
+            int idxOffset = 0;
+
+            for (CoreMap sent : doc.get(SentencesAnnotation.class)) {
+                tokens = sent.get(TokensAnnotation.class);
+                deps = sent.get(BasicDependenciesAnnotation.class).getEdgeSet();
+                roots = sent.get(BasicDependenciesAnnotation.class).getRoots();
+
+                depths = getDepths();
+
+                phIs = new ArrayList<Integer>();
+                for (int idx : origPhIs) {
+                    if (idx >= idxOffset && idx - idxOffset < tokens.size()) {
+                        phIs.add(idx - idxOffset);
+                    }
+                }
+                phIs = filterIndices(phIs);
+
+                idxOffset = tokens.size();
+
+                parsePhraseCore();
+            }
+
             String output = "";
             if (results.size() == 0) {
                 output = "#FAIL#";
@@ -115,6 +146,15 @@ public class ParseRule {
         }
 
         public static void parsePhraseCore() {
+/*
+            System.out.println("Parse phrase:");
+            for (int idx : phIs) {
+                System.out.print(getWordStr(tokens.get(idx - 1)) + "\t");
+            }
+            System.out.println();
+            System.out.println("Highest node:\t" + getWordStr(tokens.get(findHighestNode() - 1)));
+*/
+
             String result = "";
 
             if (phIs.size() == 0) {
@@ -144,6 +184,16 @@ public class ParseRule {
             boolean pp = false;
             boolean np = false;
 
+            int rootIdx = findHighestNode();
+            String pos = tokens.get(rootIdx - 1).get(PartOfSpeechAnnotation.class);
+            if (pos.startsWith("VB")) {
+                vp = true;
+            } else if (pos.startsWith("IN")) {
+                pp = true;
+            } else if (pos.startsWith("NN")) {
+                np = true;
+            }
+/*
             for (int idx : phIs) {
                 String pos = tokens.get(idx - 1).get(PartOfSpeechAnnotation.class);
                 if (pos.startsWith("VB")) {
@@ -160,7 +210,8 @@ public class ParseRule {
                     np = true;
                 }
             }
-
+*/
+            
             if (!vp & !pp & !np) {
                 for (int idx : phIs) {
                     result = getWordStr(tokens.get(idx - 1));
@@ -196,9 +247,10 @@ public class ParseRule {
             }
  */
 
-            int rootIdx = 0;
+            //int rootIdx = 0;
 
             if (vp) {
+/*
                 for (int idx : phIs) {
                     String pos = tokens.get(idx - 1).get(PartOfSpeechAnnotation.class);
                     if (pos.startsWith("VB")) {
@@ -206,7 +258,7 @@ public class ParseRule {
                         break;
                     }
                 }
-
+*/
                 phIs.remove(phIs.indexOf(rootIdx));
                 //result += "#VP# " + getWordStr(tokens.get(rootIdx - 1));
                 result += getWordStr(tokens.get(rootIdx - 1));
@@ -246,8 +298,15 @@ public class ParseRule {
                         result += prepPh + " " + compLabel;
                         //}
                     }
+                    if ("acomp".equals(label) && govIdx == rootIdx && phIs.contains(depIdx)) {
+                        String compLabel = cntLabel(compCnt);
+                        compCnt ++;
+                        result += " acomp-" + compLabel + " ";
+                        result += getWordStr(tokens.get(depIdx - 1)) + " " + compLabel;
+                    }
                 }
             } else if (pp) {
+/*
                 for (int idx : phIs) {
                     String pos = tokens.get(idx - 1).get(PartOfSpeechAnnotation.class);
                     if (pos.startsWith("IN")) {
@@ -255,7 +314,7 @@ public class ParseRule {
                         break;
                     }
                 }
-
+*/
                 compCnt = 1;
                 String prepPh = parsePrepPhrase(rootIdx);
                 //if (prepPh == null) {
@@ -267,6 +326,8 @@ public class ParseRule {
                 //}
             } else if (np) {
                 compCnt = 1;
+                result += parseNounPhrase(rootIdx);
+/*
                 for (int idx : phIs) {
                     String word = getWordStr(tokens.get(idx - 1));
                     //if (word != null) {
@@ -279,6 +340,7 @@ public class ParseRule {
                         //phIs.remove(phIs.indexOf(idx));
                     //}
                 }
+*/
                 //result = result.trim();
             }
 
@@ -381,7 +443,22 @@ public class ParseRule {
                     }
                 }
             }
+
             result += noun + result_tail;
+
+            for (SemanticGraphEdge dep : deps) {
+                label = dep.getRelation().toString();
+                govIdx = dep.getGovernor().index();
+                depIdx = dep.getDependent().index();
+
+                if ("prep".equals(label) && govIdx == rootIdx && phIs.contains(depIdx)) {
+                    String compLabel = cntLabel(compCnt);
+                    compCnt ++;
+                    String prepPh = parsePrepPhrase(depIdx);
+                    result += " pmod-" + compLabel + " ";
+                    result += prepPh + " " + compLabel;
+                }
+            }
             return result;
         }
     }
@@ -415,6 +492,7 @@ public class ParseRule {
             lPh = editor[1];
             rPh = editor[2];
             //System.out.println(cnt + "\t" + editor[1] + "\t\t" + editor[2]);
+            //System.out.println(cnt + "\t" + rule + "\t" + lPh + "\t" + rPh + "\t" + editor[9] + "\t" + editor[10]);
 
             /*
             if (cnt < 10) {

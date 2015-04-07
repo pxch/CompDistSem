@@ -20,7 +20,7 @@ export OMP_NUM_THREADS=16
 
 # Run the OpenMP application
 javac -cp ../lib/stanford-corenlp-3.4.jar ParseRule.java
-java -Xmx4g -cp .:../lib/stanford-corenlp-3.4.jar:../lib/stanford-corenlp-3.4-models.jar ParseRule ../data/rules/final/diffRules-31-groupOf-filtered ../data/rules/final/sick_1_new_1_train
-java -Xmx4g -cp .:../lib/stanford-corenlp-3.4.jar:../lib/stanford-corenlp-3.4-models.jar ParseRule ../data/rules/final/diffRules-31-test-groupOf-filtered ../data/rules/final/sick_1_new_1_test
+java -Xmx4g -cp .:../lib/stanford-corenlp-3.4.jar:../lib/stanford-corenlp-3.4-models.jar ParseRule ../data/rules/final/diffRules-31-groupOf-filtered ../data/rules/final/sick_1_new_2_train
+java -Xmx4g -cp .:../lib/stanford-corenlp-3.4.jar:../lib/stanford-corenlp-3.4-models.jar ParseRule ../data/rules/final/diffRules-31-test-groupOf-filtered ../data/rules/final/sick_1_new_2_test
 #java -Xmx4g -cp .:../lib/stanford-corenlp-3.4.jar:../lib/stanford-corenlp-3.4-models.jar ParseRule ../data/rules/final/diffRules-rte1-filtered ../data/rules/final/rte1_1
 
