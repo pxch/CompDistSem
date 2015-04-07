@@ -48,6 +48,7 @@ public class DistVec {
             put("nsubj", true);
             put("dobj", false);
             put("pobj", false);
+            put("acomp", false);
         };
     };
 
@@ -150,6 +151,8 @@ public class DistVec {
                 }
 
                 if (!w1.startsWith("\t") && !w2.startsWith("\t")) {
+                    terms.add(new Tuple2<String, Integer>(w1 + "+" + w2, 1));
+                    /*
                     if ("amod".equals(label)) {
                         if (w1.endsWith("jj") && w2.endsWith("nn")) {
                             terms.add(new Tuple2<String, Integer>(w1 + "+" + w2, 1));
@@ -170,6 +173,7 @@ public class DistVec {
                             terms.add(new Tuple2<String, Integer>(w1 + "+" + w2, 1));
                         }
                     }
+                    */
                 }
             }
             return terms;
@@ -475,7 +479,7 @@ public class DistVec {
     public static void main(String[] args) throws Exception {
 
         String usage_str = "Usage: DistVec inputFile outputPath windowSize numPartitions" +
-            " word|amod|nsubj|dobj|pobj [--loadWordCount] [--vocabSize v] [--dim d]";
+            " word|amod|nsubj|dobj|pobj|acomp [--loadWordCount] [--vocabSize v] [--dim d]";
         if (args.length < 5) {
             System.err.println(usage_str);
             System.exit(1);
@@ -488,7 +492,7 @@ public class DistVec {
 
         String label = args[4];
         if (!"word".equals(label) && !"amod".equals(label) && !"nsubj".equals(label) &&
-            !"dobj".equals(label) && !"pobj".equals(label)) {
+            !"dobj".equals(label) && !"pobj".equals(label) && !"acomp".equals(label)) {
             System.err.println(usage_str);
             System.exit(1);
         }
