@@ -307,23 +307,30 @@ namespace DistVec {
                 }
             }
 
-            string mod_mat_file = this->mod_mat_dir + word + "." + dep_label + ".dm";
-            if (!existsFile(mod_mat_file)) {
-                cout << " matrix file " << mod_mat_file << " not found!" << endl;
-                result.setZero();
-                return result;
-            }
-            cout << " find matrix file " << mod_mat_file << endl;
-
-            dmat_t mod_mat;
-            LoadModMat(mod_mat_file, mod_mat);
-
             vec_t arg_vec = CompPhVec(comp);
-            if (arg_vec == vec_t::Zero(this->dim)) {
-                result.setZero();
-                return result;
+
+            if (dep_label == "pmod") {
+                result = result + arg_vec;
+                result = result.normalized();
+            } else {
+                string mod_mat_file = this->mod_mat_dir + word + "." + dep_label + ".dm";
+                if (!existsFile(mod_mat_file)) {
+                    cout << " matrix file " << mod_mat_file << " not found!" << endl;
+                    result.setZero();
+                    return result;
+                }
+                cout << " find matrix file " << mod_mat_file << endl;
+
+                dmat_t mod_mat;
+                LoadModMat(mod_mat_file, mod_mat);
+
+                if (arg_vec == vec_t::Zero(this->dim)) {
+                    result.setZero();
+                    return result;
+                }
+                result = result + mod_mat * arg_vec;
+                result = result.normalized();
             }
-            result = result + mod_mat * arg_vec;
         }
 
         return result;

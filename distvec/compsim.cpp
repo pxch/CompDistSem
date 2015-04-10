@@ -6,8 +6,8 @@
 using namespace std;
 
 int main (int argc, char *argv[]) {
-    if (argc != 8) {
-        cerr << "Usage: ./test1 dim vocab_size vocab_path word_dmat_path"
+    if (argc != 7) {
+        cerr << "Usage: ./test1 dim vocab_size vocab_path"
             << " mod_mat_dir rule_path output_prefix" << endl;
         exit(1);
     }
@@ -15,19 +15,20 @@ int main (int argc, char *argv[]) {
     idx_t dim = atoi(argv[1]);
     idx_t vocab_size = atoi(argv[2]);
     string vocab_path = argv[3];
-    string word_dmat_path = argv[4];
-    string mod_mat_dir = argv[5];
+    //string word_dmat_path = argv[4];
+    string mod_mat_dir = argv[4];
     if (mod_mat_dir[mod_mat_dir.length()-1] != '/') {
         mod_mat_dir += "/";
     }
-    string rule_path = argv[6];
-    string output_prefix = argv[7];
+    string rule_path = argv[5];
+    string output_prefix = argv[6];
 
     DistVec::PhSim phSim(dim, vocab_size);
 
 
     phSim.LoadVocab(vocab_path);
-    phSim.LoadWordMat(word_dmat_path);
+    //phSim.LoadWordMat(word_dmat_path);
+    phSim.LoadWordMat(mod_mat_dir + "word.dm");
 
     phSim.SetModMatDir(mod_mat_dir);
 

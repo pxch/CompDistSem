@@ -32,39 +32,52 @@ namespace DistVec {
         ReadPMI(path + label + "-phrasepmi", this->phrase_pmi);
     }
 
-    void DistVec::LoadTrainList (string path) {
+    void DistVec::LoadTrainList (string prefix) {
         train_list[0].clear();
         train_list[1].clear();
         train_list[2].clear();
+        train_list[3].clear();
+        train_list[4].clear();
 
-        cout << "------------------------------" << endl;
-        cout << "Loading training list from " << path << endl;
-        ifstream in(path.c_str());
+        string labels[5] = {"amod", "nsubj", "dobj", "pobj", "acomp"};
 
-        if (!in.is_open()) {
-            cerr << "Error!" << endl;
-            exit(-1);
-        }
+        for (int i = 0; i < 5; ++i) {
+            string path = prefix + labels[i];
+            cout << "------------------------------" << endl;
+            cout << "Loading training list from " << path << endl;
+            ifstream in(path.c_str());
 
-        string line, word, pos;
-        while (getline(in, line)) {
-            word = line.substr(0, line.find("\t"));
-            pos = word.substr(word.length() - 2, 2);
-            if (pos == "jj") {
-                train_list[0].push_back(word);
-            } else if (pos == "vb") {
-                train_list[1].push_back(word);
-            } else if (pos == "in") {
-                train_list[2].push_back(word);
+            if (!in.is_open()) {
+                cerr << "Error!" << endl;
+                exit(-1);
             }
+
+            string line, word, pos;
+            while (getline(in, line)) {
+                word = line.substr(0, line.find("\t"));
+                train_list[i].push_back(word);
+                /*
+                pos = word.substr(word.length() - 2, 2);
+                if (pos == "jj") {
+                    train_list[0].push_back(word);
+                } else if (pos == "vb") {
+                    train_list[1].push_back(word);
+                } else if (pos == "in") {
+                    train_list[2].push_back(word);
+                }
+                */
+            }
+
+            in.close();
+
+            cout << "Find " << train_list[i].size() << " " << labels[i] << endl;
+            /*
+            cout << "Find " << train_list[0].size() << " adjectives";
+            cout << ", " << train_list[1].size() << " verbs";
+            cout << ", " << train_list[2].size() << " prepositions" << endl;
+            */
+            cout << "------------------------------" << endl;
         }
-
-        in.close();
-
-        cout << "Find " << train_list[0].size() << " adjectives";
-        cout << ", " << train_list[1].size() << " verbs";
-        cout << ", " << train_list[2].size() << " prepositions" << endl;
-        cout << "------------------------------" << endl;
     }
 
     void DistVec::SetOutputDir (string dir) {
@@ -136,10 +149,13 @@ namespace DistVec {
             tl_idx = 1;
             loc = 1;
         } else if (label == "dobj") {
-            tl_idx = 1;
+            tl_idx = 2;
             loc = 0;
         } else if (label == "pobj") {
-            tl_idx = 2;
+            tl_idx = 3;
+            loc = 0;
+        } else if (label == "acomp") {
+            tl_idx = 4;
             loc = 0;
         } else {
             cerr << "Invalid label: " << label << endl;

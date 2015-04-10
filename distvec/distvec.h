@@ -30,7 +30,7 @@ namespace DistVec {
         str_map word_vocab, phrase_vocab;
         smat_t word_pmi, phrase_pmi;
 
-        str_vec train_list[3];
+        str_vec train_list[5];
 
         dmat_t trans_mat, word_dmat, phrase_dmat;
 

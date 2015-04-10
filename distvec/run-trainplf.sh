@@ -20,6 +20,7 @@ export OMP_NUM_THREADS=16
 
 make trainplf
 # Run the OpenMP application
-./trainplf ../corpora/ukwac_1_50k_20k_2 ../corpora/word_count.txt mod_mat_50k_20k_300_1/ 300
+#./trainplf ../corpora/ukwac_1_50k_20k_2 ../corpora/word_count.txt mod_mat_50k_20k_300_1/ 300
 #./trainplf ../corpora/ukwac_2 ../corpora/word_count.txt mod_mat_3/ 100
+./trainplf ../../corpora/bnc+ukwac+wiki ../data/wordlist/sick+rte- ../data/mod_mat_bnc+ukwac+wiki/ 300
 

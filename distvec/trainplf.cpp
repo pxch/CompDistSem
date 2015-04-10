@@ -28,20 +28,22 @@ int main (int argc, char *argv[]) {
     DistVec::DistVec distVec(dim);
 
     distVec.LoadTrainList(train_list_path);
+
     distVec.SetOutputDir(output_dir);
 
     distVec.LoadWord(input_dir);
     distVec.CompTransMat();
     distVec.CompDenseWordVec();
 
-    string labels[4] = {"amod", "nsubj", "dobj", "pobj"};
+    string labels[5] = {"amod", "nsubj", "dobj", "pobj", "acomp"};
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 5; ++i) {
         distVec.LoadPhrase(input_dir, labels[i]);
         distVec.CompDensePhraseVec();
 
         distVec.TrainPLF(labels[i]);
     }
+
 
 /*
     string word1, word2;
